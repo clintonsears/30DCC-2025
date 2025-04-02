@@ -1,0 +1,504 @@
+---
+title: "Spotted Lanternfly Migration - 2 April 2025"
+author: "Clinton Sears"
+format: html
+editor: visual
+---
+
+## Background
+
+The spotted lanternfly (Lycorma delicatula) has been rapidly spreading throughout the northeastern United States since its introduction to Pennsylvania in 2014. While not truly migratory, these invasive insects disperse efficiently by hitchhiking on vehicles, cargo, and outdoor equipment, allowing them to establish new populations across state lines. They pose a significant economic risk because they feed on over 70 plant species, including important agricultural crops like grapes, hops, and fruit trees, causing severe damage by extracting sap and excreting honeydew that promotes sooty mold growth. Their feeding weakens plants, reduces yields, and can lead to plant death, threatening agricultural industries and forest ecosystems throughout the region.
+
+Data were download from the Global Biodiversity Information Facility and include only research grade observations with a CC-BY-NC 4.0 License from iNaturalist.
+
+Citation: GBIF.org (30 March 2025) GBIF Occurrence Download <https://doi.org/10.15468/dl.6ns9jc>, and also cite NJ DOA for quote about spotted lanternfly: <https://www.nj.gov/agriculture/divisions/pi/prog/pests-diseases/spotted-lanternfly/>
+
+## Load Data and Packages, Basic Cleaning
+
+Note that data are already clean. Four observations that were missing lat/lon and state were deleted, leaving 26,364 observations.
+
+```{r}
+#| echo: false
+
+slm <- read.csv("C:/Users/clint/OneDrive/Code/Spotted Lanternfly/spotted_lanternfly_clean.csv")
+
+library(tidyverse)
+library(sf)
+library(maps)
+library(patchwork) # For making final, combined viz
+library(stringr)  # For str_wrap function
+library(grid) # For social media content
+library(png) # For social media icons (since I don't have the font)
+
+summary(slm)
+# Everything looks fine
+
+table(slm$state)
+# It may be helpful to have state code rather than full name...
+slm <- slm |>
+  mutate(
+    state_code = case_when(
+      state == "Connecticut" ~ "CT",
+      state == "Delaware" ~ "DE",
+      state == "District of Columbia" ~ "DC",
+      state == "Maryland" ~ "MD",
+      state == "Massachusetts" ~ "MA",
+      state == "New Hampshire" ~ "NH",
+      state == "New Jersey" ~ "NJ",
+      state == "New York" ~ "NY",
+      state == "Pennsylvania" ~ "PA",
+      state == "Rhode Island" ~ "RI",
+      state == "Vermont" ~ "VT",
+      state == "Virginia" ~ "VA",
+      state == "West Virginia" ~ "WV",
+    )
+  )
+table(slm$state_code)
+length(slm$state_code)
+# No problems with state_code
+
+# Review year data
+table(slm$year)
+# Let's drop 2025 because it's only March. That will give us 10 years of data
+slm <- slm |> 
+  filter(year != 2025)
+slm$year <- factor(slm$year)
+
+# Create the year_pairs variable
+slm <- slm |>
+  mutate(
+    year_pairs = case_when(
+      year %in% c("2015", "2016") ~ "2015-2016",
+      year %in% c("2017", "2018") ~ "2017-2018",
+      year %in% c("2019", "2020") ~ "2019-2020",
+      year %in% c("2021", "2022") ~ "2021-2022",
+      year %in% c("2023", "2024") ~ "2023-2024",
+      TRUE ~ NA_character_ # Handle any other years
+    )
+  )
+
+# Review the new variable
+table(slm$year_pairs)
+```
+
+## Line Chart 2
+
+Updated version of my first chart that is more polished, includes quote from NJ DOA, and text formatted to match the other plots produced below.
+
+::: {.callout-note}
+In geom_line, I first used size but that's been deprecated so I updated to linewidth.
+:::
+
+```{r}
+#| echo: false
+
+year_counts <- aggregate(species ~ year, data = slm, FUN = length)
+colnames(year_counts)[2] <- "count"  # Rename the count column
+
+# Create the year plot
+year_plot_2 <- ggplot(year_counts, aes(x = year, y = count, group = 1)) +
+  geom_line(color = "darkred", linewidth = 1.5) +
+  geom_point(color = "darkred", size = 2) +
+  geom_text(aes(label = count), vjust = -1, color = "black", size = 3.5) +
+  
+  # Add text annotation (text box)
+  annotate(
+    "label", 
+    x = 1, # Adjust this x position as needed
+    y = max(year_counts$count)/1.5, # Position in the middle vertically
+    label = str_wrap("Spotted lanternflies are a significant problem in the US because they feed on sap from over 70 different plant species, including important agricultural crops and trees, weakening them and making them susceptible to disease and death. - New Jersey Department of Agriculture", width = 45),
+    hjust = 0, 
+    vjust = 0.5,
+    size = 3.5,
+    lineheight = 0.9,
+    fill = "white", 
+    alpha = 0.8,
+    color = "darkred",
+    label.size = NA,
+    fontface = "italic"
+  ) +
+  
+  
+  labs(title = "iNaturalist Users Track the Lanternfly Uptick",
+       subtitle = "Observations by naturalists, biologists, and citizen scientists surged tenfold from 2019 to 2023",
+       x = NULL) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face = "bold", size = 14, hjust = 0),
+    plot.subtitle = element_text(face = "italic"),
+    plot.margin = unit(c(10,5.5,5.5,5.5), "pt")
+  ) +
+  coord_cartesian(clip = "off")
+
+# Save the plot with the specified dimensions
+ggsave("line_chart_2.png", plot = year_plot_2, width = 6.5, height = 3, units = "in")
+
+# You can also specify other file formats like PDF:
+# ggsave("year_plot.pdf", plot = year_plot, width = 6, height = 3, units = "in")
+
+# If you just want to see it in the R graphics window with those dimensions
+# (note: this might not always be precise and depends on your window size)
+options(repr.plot.width = 6.5, repr.plot.height = 3)
+print(year_plot_2)
+options(repr.plot.width = NULL, repr.plot.height = NULL) # Reset options
+```
+
+## Map Facet 3 - Only 5 Panels
+
+My first map facet was choropleth and just didn't work visually. The 2nd was comprised of 10 panels, one for each year–but that was too much. Five maps was sufficient to tell the story.
+
+```{r}
+#| echo: false
+
+# 1. Define the list of states you want to include
+selected_states_abbr <- c("CT", "DC", "DE", "MA", "MD", "ME", "NH", "NJ", "NY", "PA", "RI", "VA", "VT", "WV")
+
+# 2. Get spatial data for US states
+# Using the 'maps' package directly and then converting to sf
+us_states_map <- maps::map("state", plot = FALSE, fill = TRUE)
+us_states <- sf::st_as_sf(us_states_map)
+
+# Rename the 'ID' column to 'region' to match the previous logic
+us_states <- us_states %>%
+  rename(region = ID)
+
+# Convert state names in the spatial data to uppercase for easier comparison
+us_states$region_upper <- toupper(us_states$region)
+
+# Create a mapping between state abbreviations and the names in the spatial data
+state_abbr_to_name <- data.frame(
+  state_code = selected_states_abbr,
+  region_upper = c("CONNECTICUT", "DISTRICT OF COLUMBIA", "DELAWARE", "MASSACHUSETTS", "MARYLAND",
+                   "MAINE", "NEW HAMPSHIRE", "NEW JERSEY", "NEW YORK", "PENNSYLVANIA", "RHODE ISLAND",
+                   "VIRGINIA", "VERMONT", "WEST VIRGINIA")
+)
+
+# 3. Filter the spatial data to include only the selected states
+eastern_states_spatial <- us_states %>%
+  inner_join(state_abbr_to_name, by = "region_upper")
+
+# 4. Filter your slm data for the selected states
+slm_eastern <- slm %>%
+  filter(state_code %in% selected_states_abbr)
+
+# 5. Create the point map series using ggplot2
+point_map_series_3 <- ggplot() +
+  geom_sf(data = eastern_states_spatial, color = "gray20", fill = "gray95", linewidth = 0.3) +
+  geom_point(data = slm_eastern, aes(x = lon, y = lat), color = "darkred", size = .5, alpha = 0.5) +
+  coord_sf(xlim = c(min(slm_eastern$lon) - 1, max(slm_eastern$lon) + 1),
+           ylim = c(min(slm_eastern$lat) - 1, max(slm_eastern$lat) + 1)) +
+  facet_wrap(vars(year_pairs), ncol = 5, switch = "x") +
+  labs(title = "A Decade of Lanternfly Territory Gain",
+       subtitle = "Mid-Atlantic hardest hit; Maine the sole New England holdout. Each circle is one observation.") +
+  theme_minimal() +
+  theme(
+    strip.background = element_blank(),
+    plot.title = element_text(face = "bold", size = 14, hjust = 0), 
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    panel.grid.major = element_blank(),
+    plot.subtitle = element_text(face = "italic")
+  )
+
+# Print the point map series
+print(point_map_series_3)
+
+# Save the plot with specified dimensions
+ggsave("map_facet_3.png", plot = point_map_series_3, width = 6.5, height = 5, units = "in")
+```
+
+## Line Facet of Obs by Month
+
+This took a while to get right. The previous two plots use red to show danger/a problem, while this switches to blue and invites the read to take action by using iNaturalist to made observations of spotted lanternflies in their area.
+
+```{r}
+#| echo: false
+
+table(slm$species,slm$month,slm$state)
+table(slm$species,slm$state)
+
+slm <- slm |>
+  mutate(
+    state_code_PLUS = case_when(
+      state == "Connecticut" ~ "CT [456]",
+      state == "Delaware" ~ "DE [506]",
+      state == "District of Columbia" ~ "DC [X]",
+      state == "Maryland" ~ "MD [3,098]",
+      state == "Massachusetts" ~ "MA [46]",
+      state == "New Hampshire" ~ "NH [1]",
+      state == "New Jersey" ~ "NJ [5,556]",
+      state == "New York" ~ "NY [8,629]",
+      state == "Pennsylvania" ~ "PA [5,882]",
+      state == "Rhode Island" ~ "RI [89]",
+      state == "Vermont" ~ "VT [3]",
+      state == "Virginia" ~ "VA [1,704]",
+      state == "West Virginia" ~ "WV [216]",
+    )
+  )
+
+# 1. Aggregate the data to count species observations per state and month, excluding DC
+state_month_counts <- slm %>%
+  filter(state_code_PLUS != "DC [X]") %>% # Exclude DC
+  group_by(state_code_PLUS, month) %>% # Group by state and month
+  summarise(observation_count = n(), .groups = 'drop')
+
+# 2. Calculate total observations per state
+state_totals <- state_month_counts %>%
+  group_by(state_code_PLUS) %>%
+  summarise(total_observations = sum(observation_count), .groups = 'drop') %>%
+  arrange(desc(total_observations))
+
+# 3. Create an ordered factor of state_code based on total observations
+ordered_states <- state_totals$state_code_PLUS
+
+# 4. Convert state_code in state_month_counts to an ordered factor
+state_month_counts <- state_month_counts %>%
+  mutate(state_code_PLUS = factor(state_code_PLUS, levels = ordered_states))
+
+# Create unique single-letter month abbreviations
+month_abbr_vector <- c("J", "F", "M", "A", "y", "u", "l", "g", "S", "O", "N", "D") # Using 'y' for May and 'u' for June, 'l' for July, 'g' for August to avoid duplicates
+
+# Recode the month variable as an ordered factor
+month_levels <- c("J", "F", "M", "A", "y", "u", "l", "g", "S", "O", "N", "D")
+state_month_counts <- state_month_counts %>%
+  mutate(month_abbr = factor(month_abbr_vector[month], levels = month_levels))
+
+# 5. Create the line graph faceted by state and showing counts by month
+state_month_line_chart <- ggplot(state_month_counts, aes(x = month_abbr, y = observation_count, group = 1)) + # Use month_abbr on x-axis
+  geom_line(color = "darkblue", size = 1) + # Use geom_line
+  facet_wrap(vars(state_code_PLUS), ncol = 6, switch = "x") + 
+  labs(title = "Distribution of Lanternfly Observations from January to December, by State",
+       subtitle = "Citizen scientists are most likely to observe adult lanternflies (with distinctive red hindwings) in late summer.\nTotal observations from 2015 to 2024 for each state in brackets.",
+       x = "Month",
+       y = NULL) + # Added y-axis label
+  theme_minimal() +
+  theme(
+    axis.text.x = element_blank(), 
+    strip.background = element_blank(), 
+    strip.text = element_text(face = "bold"),
+    plot.title = element_text(face = "bold", size = 14, hjust = 0, color = "darkblue"),
+    panel.grid.major.x = element_blank(), 
+    panel.grid.minor.x = element_blank(),  
+    panel.grid.major.y = element_line(color = "gray95"), 
+    panel.grid.minor.y = element_blank(),
+    plot.subtitle = element_text(face = "italic")
+  ) +
+  scale_y_continuous(limits = c(0, 2000)) +
+  geom_hline(yintercept = 0, color = "gray60", linewidth = 0.5)
+
+# Print the line chart
+print(state_month_line_chart)
+
+# Save the plot with specified dimensions
+ggsave("observations_by_state_month_ordered_no_hlines_ylim.png", plot = state_month_line_chart, width = 10, height = 6, units = "in") # Updated filename
+```
+
+## Social Media Annotations
+
+Adding this into my caption to make sure folks can connect with me, if needed.
+
+Very helpful blog post: <https://nrennie.rbind.io/blog/adding-social-media-icons-ggplot2/>
+
+Unfortunately, it seems that Font Awesome no longers allows free download of brands logos as a font. I have a bunch of SVGs though...
+
+Code below uses an alternative approach.
+
+```{r}
+
+# Create text grobs for the social media info
+library(grid)
+library(png)
+
+# Assuming you've converted your SVGs to PNGs
+github_icon <- readPNG("C:/Users/clint/OneDrive/Data/social media icons/github.png")
+mastodon_icon <- readPNG("C:/Users/clint/OneDrive/Data/social media icons/mastodon.png")
+
+# Create a function to make a social media footer
+create_social_footer <- function(github_user = NULL, mastodon_user = NULL) {
+  # Create an empty grob
+  footer <- grid::gTree(children = grid::gList())
+  
+  # Add GitHub info if provided
+  if (!is.null(github_user)) {
+    github_grob <- grid::grobTree(
+      grid::rasterGrob(github_icon, x = 0.01, y = 0.5, width = 0.02, just = c("left", "center")),
+      grid::textGrob(paste0("github.com/", github_user), x = 0.04, y = 0.5, just = c("left", "center"),
+                     gp = grid::gpar(col = "darkblue", fontsize = 8))
+    )
+    footer <- grid::grobTree(children = grid::gList(footer, github_grob))
+  }
+  
+  # Add Mastodon info if provided
+  if (!is.null(mastodon_user)) {
+    mastodon_grob <- grid::grobTree(
+      grid::rasterGrob(mastodon_icon, x = 0.2, y = 0.5, width = 0.02, just = c("left", "center")),
+      grid::textGrob(paste0("@", mastodon_user), x = 0.23, y = 0.5, just = c("left", "center"),
+                     gp = grid::gpar(col = "darkblue", fontsize = 8))
+    )
+    footer <- grid::grobTree(children = grid::gList(footer, mastodon_grob))
+  }
+  
+  return(footer)
+}
+
+
+# Create social media footer
+social_footer <- create_social_footer(github_user = "clintonsears", mastodon_user = "clintonsears")
+```
+
+## Social Media Footer
+
+Note that gpar(col = "blue") doesn't work. Need to modify original PNG to the color needed, or explore other R packages.
+
+```{r, include=FALSE}
+
+github_icon <- readPNG("C:/Users/clint/OneDrive/Data/social media icons/github_282c79.png")
+mastodon_icon <- readPNG("C:/Users/clint/OneDrive/Data/social media icons/mastodon_282c79.png")
+# You'll need to add the bluesky icon to your folder
+bluesky_icon <- readPNG("C:/Users/clint/OneDrive/Data/social media icons/bluesky_282c79.png")
+
+# Create a function to make a social media footer
+create_social_footer <- function(github_user = NULL, mastodon_user = NULL, bluesky_user = NULL) {
+  # Create an empty grob
+  footer <- grid::gTree(children = grid::gList())
+  
+  # Current position tracker (x coordinate)
+  current_x <- 0.01
+  
+  # Add Mastodon info if provided (first social media)
+  if (!is.null(mastodon_user)) {
+    mastodon_grob <- grid::grobTree(
+      grid::rasterGrob(mastodon_icon, x = current_x, y = 0.5, width = 0.02, just = c("left", "center"),
+                      gp = grid::gpar(col = "blue")),
+      grid::textGrob(paste0("@", mastodon_user), x = current_x + 0.03, y = 0.5, just = c("left", "center"),
+                     gp = grid::gpar(col = "black", fontsize = 8))
+    )
+    footer <- grid::grobTree(children = grid::gList(footer, mastodon_grob))
+    
+    # Update position for next item
+    current_x <- current_x + 0.15
+  }
+  
+  # Add GitHub info if provided (second social media)
+  if (!is.null(github_user)) {
+    github_grob <- grid::grobTree(
+      grid::rasterGrob(github_icon, x = current_x, y = 0.5, width = 0.02, just = c("left", "center"),
+                      gp = grid::gpar(col = "blue")),
+      grid::textGrob(paste0("github.com/", github_user), x = current_x + 0.03, y = 0.5, just = c("left", "center"),
+                     gp = grid::gpar(col = "black", fontsize = 8))
+    )
+    footer <- grid::grobTree(children = grid::gList(footer, github_grob))
+    
+    # Update position for next item
+    current_x <- current_x + 0.20
+  }
+  
+  # Add Bluesky info if provided (third social media)
+  if (!is.null(bluesky_user)) {
+    bluesky_grob <- grid::grobTree(
+      grid::rasterGrob(bluesky_icon, x = current_x, y = 0.5, width = 0.02, just = c("left", "center"),
+                      gp = grid::gpar(col = "blue")),
+      grid::textGrob(bluesky_user, x = current_x + 0.03, y = 0.5, just = c("left", "center"),
+                     gp = grid::gpar(col = "black", fontsize = 8))
+    )
+    footer <- grid::grobTree(children = grid::gList(footer, bluesky_grob))
+  }
+  
+  return(footer)
+}
+
+# Create social media footer with all elements
+social_footer <- create_social_footer(
+  github_user = "clintonsears", 
+  mastodon_user = "clintonsears",
+  bluesky_user = "@clintonsears.bsky.social"
+)
+
+# To view the footer (uncomment to test)
+grid.newpage()
+grid.draw(social_footer)
+```
+
+## Final Viz
+
+4th version...
+
+Previous "final" versions incorporated plots that simply didn't work out, so this is the actual final visual.
+
+::: {.callout-note}
+
+Review the final PDF or PNG to see properly formatted visual.
+
+:::
+
+```{r, include=FALSE}
+
+# Create the combined plots first
+combined_plot <- year_plot_2 /
+                    point_map_series_3 / 
+                    state_month_line_chart +
+                    plot_layout(heights = c(.7, 1, 1),
+                                ncol = 1,
+                                guides = "collect") &
+                    theme(plot.margin = margin(0.5, 0.5, 0.5, 0.5, "cm"))
+
+# Create an annotation grob for your social media footer that will be outside the plot layout system
+library(grid)
+library(gridExtra)
+
+# Create a gtable for holding the social media content
+social_gtable <- arrangeGrob(
+  social_footer,
+  bottom = textGrob("", gp = gpar(fontsize = 8))
+)
+
+# Add title and annotations to create final_plot_3 with proper caption
+final_plot_3 <- combined_plot +
+  plot_annotation(
+    title = "**From Introduction to Infestation:**<br>**The Spotted Lanternfly's Population Explosion**",
+    subtitle = "<br>Introduced to Pennsylvania in 2014, the spotted lanternfly (*Lycorma delicatula*) has <br>rapidly spread throughout the northeastern US, posing a significant threat to agriculture<br> and ecosystems. This visualization depicts its spread using research-grade observations<br> submitted to iNaturalist and accessed via Global Biodiversity Information Facility.",
+    caption = "Data Sources: GBIF.org (30 March 2025) GBIF Occurrence Download https://doi.org/10.15468/dl.6ns9jc and \nNew Jersey Dept. of Agriculture https://www.nj.gov/agriculture/divisions/pi/prog/pests-diseases/spotted-lanternfly/",
+    theme = theme(
+      plot.title = ggtext::element_markdown(size = 24, hjust = 0, color = "darkred"), 
+      plot.subtitle = ggtext::element_markdown(size = 14),
+      plot.margin = margin(1, 1, 1, 1, "cm")
+    )
+  ) &
+  theme(plot.margin = margin(0.7, 0.2, 0.7, 0.2, "cm"))
+
+# Print the combined plot
+print(final_plot_3)
+
+# Save the plot to a temporary file
+temp_file <- tempfile(fileext = ".png")
+ggsave(temp_file, plot = final_plot_3, width = 8.5, height = 11.7, units = "in")
+
+# Now read it back in as a single image
+library(png)
+plot_img <- readPNG(temp_file)
+
+# Create a new plot with the image and the social footer
+png("spotted lanternfly_FINAL.png", width = 8.5, height = 12, units = "in", res = 300)
+grid.newpage()
+# Draw the main plot image (takes up 98% of height)
+grid.raster(plot_img, width = unit(1, "npc"), height = unit(0.98, "npc"), 
+            just = c("center", "top"), y = unit(1, "npc"))
+# Draw the social media footer at the bottom (takes up 2% of height)
+pushViewport(viewport(y = unit(0.01, "npc"), height = unit(0.02, "npc"),
+                      x = unit(.94, "npc"),
+                     just = c("center", "bottom")))
+grid.draw(social_footer)
+popViewport()
+dev.off()
+
+# PDF process is a bit different...
+# After a lot of fuss I could not get PDF to save correctly.
+```
