@@ -1,0 +1,126 @@
+-- Data Source: https://www.sciencebase.gov/catalog/item/663ce56cd34e77890839e1c8
+-- Note that data are labeled "Vermont" but are really just from Caledonia, Essex, and Orleans Counties
+-- Query to link the two tables
+SELECT  
+  a.fk_taxonid,
+  m.start_date
+FROM
+  `sharp-maker-362019.vt_mammals.annotations` a
+JOIN
+  `sharp-maker-362019.vt_mammals.media` m ON a.fk_mediaid = m.pk_mediaid;
+
+
+-- Identify data types
+SELECT column_name, data_type
+FROM `sharp-maker-362019.vt_mammals`.INFORMATION_SCHEMA.COLUMNS
+WHERE table_name = 'annotations' AND column_name = 'fk_mediaid';
+-- Confirm that fk_mediaid is INT64
+-- We can see that in the schema, but this uses a query to confirm it.
+
+-- Extract month, both as number and name
+SELECT  
+  a.fk_taxonid,
+  EXTRACT(MONTH FROM m.start_date) AS month_number,
+  FORMAT_DATETIME('%b', m.start_date) AS month_code
+FROM
+  `sharp-maker-362019.vt_mammals.annotations` a
+JOIN
+  `sharp-maker-362019.vt_mammals.media` m ON a.fk_mediaid = m.pk_mediaid;
+-- Incredible!
+
+-- Get count of distinct values for fk_taxonid
+SELECT
+  COUNT(DISTINCT a.fk_taxonid) AS num_species
+FROM
+  `sharp-maker-362019.vt_mammals.annotations` a
+JOIN
+  `sharp-maker-362019.vt_mammals.media` m ON a.fk_mediaid = m.pk_mediaid;
+-- RESULT: There are 37 values in a.fk_taxonid.
+
+
+-- Get count of each species, rather than total number of unique species
+SELECT
+    a.fk_taxonid,
+    COUNT(*) AS count_per_species
+FROM
+    `sharp-maker-362019.vt_mammals.annotations` a
+JOIN
+    `sharp-maker-362019.vt_mammals.media` m ON a.fk_mediaid = m.pk_mediaid
+GROUP BY
+    a.fk_taxonid
+ORDER BY
+    count_per_species DESC; -- Optional: Order by count in descending order
+-- RESULT: 19,670 Moose observations, and 2,059 Black Bear observations
+
+
+-- How many observations in this joined table?
+SELECT
+    COUNT(*) AS total_observations
+FROM
+    `sharp-maker-362019.vt_mammals.annotations` a
+JOIN
+    `sharp-maker-362019.vt_mammals.media` m ON a.fk_mediaid = m.pk_mediaid;
+-- RESULT: 49,240, so about 20% are Moose!
+
+
+-- Count number of Moose
+SELECT
+    EXTRACT(MONTH FROM m.start_date) AS month_number,
+    FORMAT_DATETIME('%b', m.start_date) AS month_name,
+    COUNT(*) AS moose_count
+FROM
+    `sharp-maker-362019.vt_mammals.annotations` a
+JOIN
+    `sharp-maker-362019.vt_mammals.media` m ON a.fk_mediaid = m.pk_mediaid
+WHERE
+    a.fk_taxonid = 'Moose'
+GROUP BY
+    month_number, month_name
+ORDER BY
+    month_number;
+
+
+-- Count number of Black Bear
+SELECT
+    EXTRACT(MONTH FROM m.start_date) AS month_number,
+    FORMAT_DATETIME('%b', m.start_date) AS month_name,
+    COUNT(*) AS black_bear_count
+FROM
+    `sharp-maker-362019.vt_mammals.annotations` a
+JOIN
+    `sharp-maker-362019.vt_mammals.media` m ON a.fk_mediaid = m.pk_mediaid
+WHERE
+    a.fk_taxonid = 'Black Bear'
+GROUP BY
+    month_number, month_name
+ORDER BY
+    month_number;
+
+
+-- Combine queries into one
+SELECT
+  EXTRACT(MONTH FROM m.start_date) AS month_number,
+  FORMAT_DATETIME('%b', m.start_date) AS month_name,
+  COUNT(CASE WHEN a.fk_taxonid = 'Moose' THEN 1 END) AS moose_count,
+  COUNT(CASE WHEN a.fk_taxonid = 'Black Bear' THEN 1 END) AS black_bear_count
+FROM
+    `sharp-maker-362019.vt_mammals.annotations` a
+JOIN
+    `sharp-maker-362019.vt_mammals.media` m ON a.fk_mediaid = m.pk_mediaid
+WHERE
+  a.fk_taxonid IN ('Moose', 'Black Bear') -- Filter for BOTH species
+GROUP BY
+  month_number, month_name
+ORDER BY
+  month_number;
+
+
+-- Determine date range of joined table
+SELECT
+    MIN(m.start_date) AS oldest_observation,
+    MAX(m.start_date) AS newest_observation
+FROM
+    `sharp-maker-362019.vt_mammals.annotations` a
+JOIN
+    `sharp-maker-362019.vt_mammals.media` m ON a.fk_mediaid = m.pk_mediaid;
+-- RESULT: Data range from Jan 1, 2014 through Dec 31, 2022.
