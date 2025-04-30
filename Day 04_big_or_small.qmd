@@ -1,0 +1,89 @@
+---
+title: "Day 04_big_or_small"
+author: "Clinton Sears"
+format: html
+editor: visual
+---
+
+## Load Libraries and Data
+
+When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+
+```{r}
+#| echo: false
+library(readODS)
+library(tidyverse)
+library(waffle)
+library(gridExtra)
+library(stringr)
+
+data <- read_ods("C:/Users/clint/OneDrive/Code/Python/2025 30DCC Python/04 big or small/Day 04_big_or_small.ods")
+
+head(data)
+
+data <- data |> 
+  filter(org != "Wild (20-100 chimps)")
+```
+
+## Produce Waffle Chart
+
+```{r}
+# Create the data frame
+data <- data.frame(
+  org = factor(c("ZAA Cage", "AZA Cage", "Wild and Free"),
+               levels = c("ZAA Cage", "AZA Cage", "Wild and Free")),
+  value = c(1, 8, 355),  # Changed from 241 to 341
+  color = c("#38040E", "#D5A021", "darkgreen") 
+)
+
+# Expand the data frame
+expanded_data <- data.frame(
+  org = factor(unlist(sapply(1:nrow(data), function(i) rep(as.character(data$org[i]), data$value[i]))), 
+               levels = as.character(data$org)),
+  color = unlist(sapply(1:nrow(data), function(i) rep(data$color[i], data$value[i])))
+)
+
+# Calculate row and column positions
+rows <- 14  # Increased from 10 to 14 rows to accommodate more squares without expanding area
+n_cols <- ceiling(nrow(expanded_data) / rows)
+expanded_data$index <- 1:nrow(expanded_data)
+expanded_data$col <- ((expanded_data$index - 1) %% n_cols) + 1
+expanded_data$row <- rows - floor((expanded_data$index - 1) / n_cols)
+
+# Define the subtitle text
+subtitle_text <- "The Zoological Association of America (ZAA) only requires 240 square feet of space for an adult chimp, while the American Association of Zoos and Aquariums requires 2,000. In the wild, chimps have more than 3,000,000 square feet of space with their community. This plot doesn't have enough space to show how massive the chimp territory in the wild truly is."
+
+# Define the caption text - using a consistent width for wrapping
+caption_text <- "Data Sources: King, B.J. Animals' Best Friends: Putting Compassion to Work for Animals in Captivity and in the Wild (2021) and Fultz et al. How Sanctuary Chimpanzees (Pan troglodytes) Use Space after Being Introduced to a Large Outdoor Habitat. Animals (Basel). 2023 Mar 7;13(6):961."
+
+# Create the waffle plot
+p <- ggplot(expanded_data, aes(x = col, y = row, fill = org)) +
+  geom_tile(color = "gray90", linewidth = 0.8) +  # Slightly thinner lines to accommodate more squares
+  scale_fill_manual(name = NULL, values = setNames(data$color, as.character(data$org))) +
+  coord_equal() +
+  theme_void() +
+  labs(
+    title = "The Space Divide: Minimum Chimp Habitat in Zoos and the Wild",
+    subtitle = str_wrap(subtitle_text, width = 80),
+    caption = str_wrap(caption_text, width = 80)
+  ) +
+  theme(
+    plot.title = element_text(hjust = 0, margin = margin(b = 10), size = 16, face = "bold"),
+    plot.subtitle = element_text(hjust = 0, margin = margin(b = 15), size = 12, face = "italic"),
+    legend.position = "right",
+    legend.text = element_text(size = 10),
+    legend.title = element_text(size = 12),
+    plot.caption = element_text(hjust = 0, size = 8, margin = margin(t = 15)),
+    plot.margin = margin(l = 20, r = 20, t = 20, b = 20),
+    plot.background = element_rect(fill = "gray90", color = NA)
+  )
+
+# Ensure the plot has enough space for all text elements
+p <- p + theme(aspect.ratio = 0.8)
+
+# Print the plot
+print(p)
+
+# Save the plot with the specified dimensions
+ggsave("Day 04_big_or_small.png", plot = p, width = 8, height = 7, units = "in")
+```
